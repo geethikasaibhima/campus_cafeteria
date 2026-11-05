@@ -1,0 +1,14 @@
+{
+  "name": "campus-cafeteria-sync",
+  "version": "1.0.0",
+  "description": "Campus Cafeteria Queue Display & Dispatch",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "npm --prefix backend install",
+    "postinstall": "npm --prefix backend install"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

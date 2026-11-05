@@ -99,7 +99,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(` Campus Cafeteria Backend Server Running on Port ${PORT}`);
   console.log(` API URL:      http://localhost:${PORT}/api`);
