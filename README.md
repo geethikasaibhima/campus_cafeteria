@@ -69,70 +69,10 @@ The server will display:
 [MongoDB Connected]: Host=..., Database=campus_cafeteria
 ```
 
-### Step 4: Open the Frontend
+### Step 3: Open the Frontend
 You can open the application in any of the following ways:
 - **Direct in browser**: [http://localhost:5000/](http://localhost:5000/) (Served directly by Express backend)
 - **Local file**: Double-click `campus_cafeteria_queue_display.html` or `frontend/index.html` (auto-connects to `http://localhost:5000`).
 
 ---
 
-## 4. REST API Endpoints Summary
-
-### Menu APIs
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/menu` | Get all menu items (optional `?category=...&available=true`) |
-| `GET` | `/api/menu/:id` | Get details of a single menu item |
-| `POST` | `/api/menu` | Add a new menu item |
-| `PUT` | `/api/menu/:id` | Update menu item details |
-| `PATCH` | `/api/menu/:id/availability` | Toggle or set menu item availability |
-| `DELETE` | `/api/menu/:id` | Delete a menu item |
-
-### Order APIs
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/orders` | Place a new order (validates items, auto-calculates total, assigns counter, generates unique sequential token) |
-| `GET` | `/api/orders` | Get all orders sorted by newest first |
-| `GET` | `/api/orders/:id` | Get order by ID or orderId |
-| `GET` | `/api/orders/token/:token` | Track order by token number (e.g. `/api/orders/token/104`) |
-| `PATCH` | `/api/orders/:id/status` | Advance status (`ordered` &rarr; `cooking` &rarr; `ready` &rarr; `delivered`) |
-| `DELETE` | `/api/orders/:id` | Delete/cancel an order ticket |
-| `POST` | `/api/orders/reset-demo` | Restore demo orders and sync to MongoDB |
-
-### Dashboard & Status Queue APIs
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/dashboard/stats` | Returns `{ totalOrders, ordered, cooking, ready, delivered, totalRevenue }` |
-| `GET` | `/api/orders/status/ordered` | Newly placed orders queue |
-| `GET` | `/api/orders/status/cooking` | Active kitchen grill queue |
-| `GET` | `/api/orders/status/ready` | Orders ready for delivery pickup |
-| `GET` | `/api/orders/status/delivered`| Delivered orders history |
-
-### Authentication APIs
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Register a new user (`name`, `email`, `password`, `role`) |
-| `POST` | `/api/auth/login` | Login and receive JWT bearer token |
-| `GET` | `/api/auth/profile` | Protected endpoint returning current user details |
-
----
-
-## 5. Verification & Tested Features
-
-| # | Verified Feature | Result |
-|---|---|---|
-| 1 | **Menu items load from MongoDB** | Passed (`GET /api/menu` returns all 9 dishes) |
-| 2 | **Students can place orders** | Passed (`POST /api/orders` saves order with items and notes) |
-| 3 | **Orders saved permanently** | Passed (Persisted in MongoDB `orders` collection) |
-| 4 | **Token numbers are unique & sequential** | Passed (Atomically increments 106 &rarr; 107 &rarr; 108 without duplicates) |
-| 5 | **Empty cart validation** | Passed (Returns 400 Bad Request if cart is empty) |
-| 6 | **Server-side total calculation** | Passed (Prices recalculated on backend rather than trusting client) |
-| 7 | **Kitchen staff can update order statuses** | Passed (`PATCH /api/orders/:id/status` transitions `ordered` &rarr; `cooking` &rarr; `ready`) |
-| 8 | **Ready orders appear on delivery screen** | Passed (`GET /api/orders/status/ready` returns ready tickets) |
-| 9 | **Delivered orders stored in history** | Passed (`GET /api/orders/status/delivered` tracks completed meals) |
-| 10 | **Token tracking works correctly** | Passed (`GET /api/orders/token/:token` fetches real-time status) |
-| 11 | **Dashboard statistics are accurate** | Passed (`GET /api/dashboard/stats` matches real-time counts and revenue) |
-| 12 | **Real-time synchronization** | Passed (Socket.IO broadcasts `order:created`, `order:updated`, `order:ready`, `order:deleted`) |
-| 13 | **Audio chime notification** | Passed (Web Audio API synthesizes chime on ready, deduplicated) |
-| 14 | **Existing UI/UX 100% preserved** | Passed (All Tailwind styles, dark theme, cards, animations intact) |
-| 15 | **Data remains available after restart** | Passed (MongoDB retains all orders and sequence counters) |
