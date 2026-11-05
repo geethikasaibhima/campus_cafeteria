@@ -277,11 +277,65 @@ const seedDatabase = async () => {
     console.log('\n==========================================');
     console.log(' MongoDB Seeding Completed Successfully! ');
     console.log('==========================================');
-    process.exit(0);
+    return true;
   } catch (error) {
     console.error('[Seed Error]:', error);
-    process.exit(1);
+    throw error;
   }
 };
 
-seedDatabase();
+const autoSeedIfEmpty = async () => {
+  try {
+    const count = await Menu.countDocuments();
+    if (count === 0) {
+      console.log('[Auto-Seed] Empty menu collection detected. Seeding default cafeteria catalog...');
+      const insertedMenu = await Menu.insertMany(MENU_DATA);
+      const menuMap = {};
+      insertedMenu.forEach((m) => {
+        menuMap[m.name] = m._id;
+      });
+
+      const counterCount = await Counter.countDocuments();
+      if (counterCount === 0) {
+        await Counter.insertMany(COUNTER_DATA);
+      }
+
+      const userCount = await User.countDocuments();
+      if (userCount === 0) {
+        for (const u of USER_DATA) {
+          await User.create(u);
+        }
+      }
+
+      const orderCount = await Order.countDocuments();
+      if (orderCount === 0) {
+        const ordersToInsert = INITIAL_ORDERS_SEED.map((o) => ({
+          ...o,
+          items: o.items.map((i) => ({
+            ...i,
+            menuItemId: menuMap[i.name] || undefined,
+          })),
+        }));
+        await Order.insertMany(ordersToInsert);
+      }
+
+      await TokenCounter.findOneAndUpdate(
+        { _id: 'orderToken' },
+        { seq: 106 },
+        { upsert: true, new: true }
+      );
+      console.log('[Auto-Seed] Successfully initialized menu, counters, and initial orders in MongoDB!');
+    }
+  } catch (e) {
+    console.warn('[Auto-Seed Warning]:', e.message);
+  }
+};
+
+if (require.main === module) {
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
+}
+
+module.exports = { seedDatabase, autoSeedIfEmpty };
+

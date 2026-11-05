@@ -16,9 +16,12 @@ const authRoutes = require('./routes/authRoutes');
 const menuRoutes = require('./routes/menuRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const { autoSeedIfEmpty } = require('./seed/seedMenu');
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB and auto-seed if fresh cloud database
+connectDB().then(() => {
+  autoSeedIfEmpty();
+});
 
 const app = express();
 const server = http.createServer(app);
