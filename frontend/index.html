@@ -1,0 +1,1989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campus Cafeteria Queue Display & Dispatch</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 & ReactDOM 18 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone for JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Socket.IO CDN -->
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+
+  <!-- Custom Fonts & Animations -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.96); opacity: 0.8; }
+      50% { transform: scale(1.04); opacity: 0.4; }
+      100% { transform: scale(0.96); opacity: 0.8; }
+    }
+    .pulse-call {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-amber-500 selection:text-slate-950 flex flex-col">
+
+  <div id="root" class="flex-1 flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    const Icons = {
+      Coffee: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" />
+        </svg>
+      ),
+      ChefHat: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 13.87A4 4 0 017.41 6a5.11 5.11 0 019.18 0A4 4 0 0118 13.87V21H6v-7.13zM6 17h12" />
+        </svg>
+      ),
+      Utensils: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v13a4 4 0 01-4 4h-2M15 22v-3" />
+        </svg>
+      ),
+      Truck: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10M13 9h4l3 4v3h-7m-4 1h4" />
+        </svg>
+      ),
+      Bell: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      ),
+      Clock: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      CheckCircle: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      Tv: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10m-5-3v3M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" />
+        </svg>
+      ),
+      Plus: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+      Minus: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+        </svg>
+      ),
+      Trash: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      Volume: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
+        </svg>
+      ),
+      VolumeX: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l4-4m0 4l-4-4" />
+        </svg>
+      ),
+      ArrowLeft: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      ),
+      ArrowRight: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+        </svg>
+      ),
+      Refresh: ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      )
+    };
+
+    const MENU_CATALOG = [
+      { id: 'm1', name: 'Paneer Tikka Kathi Roll', price: 90, category: 'Grills & Rolls', time: '4-5m', desc: 'Charcoal grilled cottage cheese in handmade paratha' },
+      { id: 'm2', name: 'Crispy Veg Masala Burger', price: 80, category: 'Grills & Rolls', time: '3-4m', desc: 'Herb patty, spiced coleslaw, and toasted sesame bun' },
+      { id: 'm3', name: 'Mysore Masala Dosa', price: 95, category: 'South Indian', time: '5-6m', desc: 'Crisp crepe with red garlic chutney & spiced potato mash' },
+      { id: 'm4', name: 'Steamed Idli Sambar Platter', price: 65, category: 'South Indian', time: '2-3m', desc: 'Fluffy rice cakes with aromatic drumstick lentil sambar' },
+      { id: 'm5', name: 'Hakka Chilli Garlic Noodles', price: 110, category: 'Meals & Bowls', time: '6-7m', desc: 'Wok tossed noodles with crunchy garden vegetables' },
+      { id: 'm6', name: 'Chana Masala Rice Bowl', price: 120, category: 'Meals & Bowls', time: '4-5m', desc: 'Slow simmered spiced chickpeas over fragrant jeera rice' },
+      { id: 'm7', name: 'Iced Hazelnut Cold Brew', price: 75, category: 'Beverages', time: '2m', desc: '14-hour steep Arabica coffee with oat milk froth' },
+      { id: 'm8', name: 'Fresh Mint Lemon Cooler', price: 45, category: 'Beverages', time: '1-2m', desc: 'Freshly squeezed lemon with crushed mint and black salt' },
+      { id: 'm9', name: 'Golden Salted French Fries', price: 60, category: 'Grills & Rolls', time: '3-4m', desc: 'Double fried potato batons with peri-peri dust' }
+    ];
+
+    const INITIAL_ORDERS = [
+      {
+        id: 'ord-101',
+        token: 101,
+        studentName: 'Aarav Patel',
+        type: 'dine-in',
+        tableNumber: 'Table 4',
+        counter: 'Counter A (Hot Grills)',
+        status: 'ready',
+        items: [{ id: 'm1', name: 'Paneer Tikka Kathi Roll', qty: 1, price: 90 }, { id: 'm7', name: 'Iced Hazelnut Cold Brew', qty: 1, price: 75 }],
+        total: 165,
+        time: '12:40 PM',
+        specialNotes: 'Extra spicy roll please'
+      },
+      {
+        id: 'ord-102',
+        token: 102,
+        studentName: 'Ananya Sharma',
+        type: 'dine-out',
+        tableNumber: 'Takeaway Pack',
+        counter: 'Counter B (Beverages & Bakery)',
+        status: 'ready',
+        items: [{ id: 'm7', name: 'Iced Hazelnut Cold Brew', qty: 2, price: 75 }],
+        total: 150,
+        time: '12:43 PM',
+        specialNotes: 'Less ice'
+      },
+      {
+        id: 'ord-103',
+        token: 103,
+        studentName: 'Rohan Mehta',
+        type: 'dine-in',
+        tableNumber: 'Table 9',
+        counter: 'Counter A (Hot Grills)',
+        status: 'cooking',
+        items: [{ id: 'm5', name: 'Hakka Chilli Garlic Noodles', qty: 1, price: 110 }],
+        total: 110,
+        time: '12:48 PM',
+        specialNotes: 'No onions'
+      },
+      {
+        id: 'ord-104',
+        token: 104,
+        studentName: 'Priya Iyer',
+        type: 'dine-in',
+        tableNumber: 'Table 2',
+        counter: 'Counter C (South Indian)',
+        status: 'cooking',
+        items: [{ id: 'm3', name: 'Mysore Masala Dosa', qty: 2, price: 95 }],
+        total: 190,
+        time: '12:50 PM',
+        specialNotes: 'Crispy ghee roast'
+      },
+      {
+        id: 'ord-105',
+        token: 105,
+        studentName: 'Kabir Verma',
+        type: 'dine-out',
+        tableNumber: 'Takeaway Pack',
+        counter: 'Counter B (Beverages & Bakery)',
+        status: 'ordered',
+        items: [{ id: 'm2', name: 'Crispy Veg Masala Burger', qty: 1, price: 80 }, { id: 'm9', name: 'Golden Salted French Fries', qty: 1, price: 60 }],
+        total: 140,
+        time: '12:54 PM',
+        specialNotes: ''
+      },
+      {
+        id: 'ord-106',
+        token: 106,
+        studentName: 'Tanvi Nair',
+        type: 'dine-in',
+        tableNumber: 'Table 12',
+        counter: 'Counter C (South Indian)',
+        status: 'ordered',
+        items: [{ id: 'm4', name: 'Steamed Idli Sambar Platter', qty: 1, price: 65 }],
+        total: 65,
+        time: '12:56 PM',
+        specialNotes: 'Warm sambar in separate bowl'
+      }
+    ];
+
+    function playChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+        gain1.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start();
+        osc1.stop(ctx.currentTime + 0.55);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.16);
+        gain2.gain.setValueAtTime(0.35, ctx.currentTime + 0.16);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.85);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(ctx.currentTime + 0.16);
+        osc2.stop(ctx.currentTime + 0.85);
+      } catch (err) {
+        console.warn('Audio blocked or not supported:', err);
+      }
+    }
+
+    const API_BASE = (window.location.protocol.startsWith('http') && (window.location.port === '5000' || window.location.port === '3000'))
+      ? ''
+      : 'http://localhost:5000';
+
+    let socketClient = null;
+    try {
+      if (typeof io !== 'undefined') {
+        socketClient = io(API_BASE || window.location.origin, {
+          transports: ['websocket', 'polling'],
+          reconnectionAttempts: 15,
+          reconnectionDelay: 1000,
+        });
+      }
+    } catch (e) {
+      console.warn('Socket.IO initialization error:', e);
+    }
+
+    function App() {
+      const [orders, setOrders] = useState(INITIAL_ORDERS);
+      const [menuCatalog, setMenuCatalog] = useState(MENU_CATALOG);
+      const [syncStatus, setSyncStatus] = useState('connecting'); // 'connected' | 'connecting' | 'offline'
+
+      // currentStation: 'home' (3 role options selection) | 'student' | 'kitchen' | 'delivery' | 'tv'
+      const [currentStation, setCurrentStation] = useState('home');
+      const [soundMuted, setSoundMuted] = useState(false);
+      const [toastMsg, setToastMsg] = useState(null);
+      const [lastAnnouncedToken, setLastAnnouncedToken] = useState(101);
+      const lastChimedTokenRef = useRef(null);
+
+      const showToast = (message) => {
+        setToastMsg(message);
+        setTimeout(() => setToastMsg(null), 3500);
+      };
+
+      const announceOrderReady = (token, recipient) => {
+        setLastAnnouncedToken(token);
+        if (!soundMuted) {
+          playChime();
+        }
+        showToast(`Token #${token} is READY for ${recipient}!`);
+      };
+
+      const handleAnnounce = (token, recipient) => {
+        announceOrderReady(token, recipient);
+        if (socketClient && socketClient.connected) {
+          socketClient.emit('chime:ring', { token, recipient });
+        }
+      };
+
+      // Fetch dynamic menu from MongoDB
+      const fetchMenu = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/menu`);
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            setMenuCatalog(json.data);
+          }
+        } catch (err) {
+          console.warn('Menu fetch failed, fallback active:', err);
+        }
+      };
+
+      // Fetch orders from MongoDB
+      const fetchOrders = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/orders`);
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            setOrders(json.data);
+            setSyncStatus('connected');
+          }
+        } catch (err) {
+          console.warn('Orders fetch failed:', err);
+          setSyncStatus('offline');
+        }
+      };
+
+      // Initial data fetch
+      useEffect(() => {
+        fetchMenu();
+        fetchOrders();
+      }, []);
+
+      // Real-time synchronization via Socket.IO
+      useEffect(() => {
+        if (!socketClient) return;
+
+        const onConnect = () => {
+          setSyncStatus('connected');
+          fetchOrders();
+          fetchMenu();
+        };
+
+        const onDisconnect = () => {
+          setSyncStatus('offline');
+        };
+
+        const onConnectError = () => {
+          setSyncStatus('offline');
+        };
+
+        const onOrderCreated = (newOrder) => {
+          setOrders((prev) => {
+            const exists = prev.some(
+              (o) => (o.orderId && o.orderId === newOrder.orderId) || (o.id && o.id === newOrder.id)
+            );
+            if (exists) return prev;
+            return [newOrder, ...prev];
+          });
+        };
+
+        const onOrderUpdated = (updatedOrder) => {
+          setOrders((prev) =>
+            prev.map((ord) => {
+              if (
+                ord.id === updatedOrder.id ||
+                ord.orderId === updatedOrder.orderId ||
+                ord._id === updatedOrder._id
+              ) {
+                return { ...ord, ...updatedOrder };
+              }
+              return ord;
+            })
+          );
+        };
+
+        const onStatusChanged = ({ orderId, id, token, status }) => {
+          setOrders((prev) =>
+            prev.map((ord) => {
+              if (ord.orderId === orderId || ord.id === id || ord.id === orderId) {
+                return { ...ord, status };
+              }
+              return ord;
+            })
+          );
+        };
+
+        const onOrderReady = ({ token, recipient }) => {
+          // Avoid duplicate chime for the same token
+          if (lastChimedTokenRef.current !== token) {
+            lastChimedTokenRef.current = token;
+            announceOrderReady(token, recipient || 'Student');
+          }
+        };
+
+        const onOrderDeleted = ({ orderId, id }) => {
+          setOrders((prev) =>
+            prev.filter((o) => o.orderId !== orderId && o.id !== id && o.id !== orderId)
+          );
+        };
+
+        const onOrdersReset = (resetOrders) => {
+          setOrders(resetOrders);
+          setLastAnnouncedToken(101);
+          showToast('MongoDB demo orders restored.');
+        };
+
+        const onChimePlay = ({ token, recipient }) => {
+          announceOrderReady(token, recipient);
+        };
+
+        socketClient.on('connect', onConnect);
+        socketClient.on('disconnect', onDisconnect);
+        socketClient.on('connect_error', onConnectError);
+        socketClient.on('order:created', onOrderCreated);
+        socketClient.on('order:updated', onOrderUpdated);
+        socketClient.on('order:statusChanged', onStatusChanged);
+        socketClient.on('order:ready', onOrderReady);
+        socketClient.on('order:deleted', onOrderDeleted);
+        socketClient.on('orders:reset', onOrdersReset);
+        socketClient.on('chime:play', onChimePlay);
+
+        return () => {
+          socketClient.off('connect', onConnect);
+          socketClient.off('disconnect', onDisconnect);
+          socketClient.off('connect_error', onConnectError);
+          socketClient.off('order:created', onOrderCreated);
+          socketClient.off('order:updated', onOrderUpdated);
+          socketClient.off('order:statusChanged', onStatusChanged);
+          socketClient.off('order:ready', onOrderReady);
+          socketClient.off('order:deleted', onOrderDeleted);
+          socketClient.off('orders:reset', onOrdersReset);
+          socketClient.off('chime:play', onChimePlay);
+        };
+      }, [soundMuted]);
+
+      // Join station room
+      useEffect(() => {
+        if (socketClient && socketClient.connected) {
+          socketClient.emit('join:station', currentStation);
+        }
+      }, [currentStation]);
+
+      // Handle order status transition with MongoDB API
+      const handleStatusTransition = async (orderId, newStatus) => {
+        // Optimistic local update
+        setOrders((prev) =>
+          prev.map((ord) => {
+            if (ord.id === orderId || ord.orderId === orderId || ord._id === orderId) {
+              if (newStatus === 'ready' && ord.status !== 'ready') {
+                announceOrderReady(
+                  ord.token || ord.tokenNumber,
+                  ord.type === 'dine-in' ? ord.tableNumber : 'Dine-Out Pickup'
+                );
+              }
+              return { ...ord, status: newStatus };
+            }
+            return ord;
+          })
+        );
+
+        try {
+          const res = await fetch(`${API_BASE}/api/orders/${orderId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+          });
+          const json = await res.json();
+          if (!json.success) {
+            showToast(`Status update failed: ${json.message}`);
+            fetchOrders();
+          }
+        } catch (err) {
+          console.error('Status transition error:', err);
+          fetchOrders();
+        }
+      };
+
+      // Handle place order with MongoDB API
+      const handlePlaceOrder = async (newOrderData) => {
+        try {
+          const res = await fetch(`${API_BASE}/api/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newOrderData),
+          });
+          const json = await res.json();
+          if (json.success && json.data) {
+            const placed = json.data;
+            const assignedToken = placed.tokenNumber || placed.token;
+            showToast(`Success! Your Token #${assignedToken} sent to Kitchen`);
+            setOrders((prev) => {
+              const exists = prev.some(
+                (o) => (o.orderId && o.orderId === placed.orderId) || (o.id && o.id === placed.id)
+              );
+              if (exists) return prev;
+              return [placed, ...prev];
+            });
+            return assignedToken;
+          } else {
+            throw new Error(json.message || 'Failed to place order');
+          }
+        } catch (err) {
+          console.error('Order placement error:', err);
+          showToast(`Order failed: ${err.message}`);
+          return null;
+        }
+      };
+
+      // Handle delete order with MongoDB API
+      const handleDeleteOrder = async (orderId) => {
+        setOrders((prev) =>
+          prev.filter((o) => o.id !== orderId && o.orderId !== orderId && o._id !== orderId)
+        );
+        showToast('Order removed.');
+
+        try {
+          await fetch(`${API_BASE}/api/orders/${orderId}`, {
+            method: 'DELETE',
+          });
+        } catch (err) {
+          console.error('Order delete error:', err);
+          fetchOrders();
+        }
+      };
+
+      // Handle reset demo with MongoDB API
+      const handleResetDemo = async () => {
+        showToast('Resetting MongoDB demo orders...');
+        try {
+          const res = await fetch(`${API_BASE}/api/orders/reset-demo`, {
+            method: 'POST',
+          });
+          const json = await res.json();
+          if (json.success && json.data) {
+            setOrders(json.data);
+            setLastAnnouncedToken(101);
+            showToast('Synchronized demo data reset.');
+          } else {
+            setOrders(INITIAL_ORDERS);
+            setLastAnnouncedToken(101);
+            showToast('Synchronized demo data reset locally.');
+          }
+        } catch (err) {
+          setOrders(INITIAL_ORDERS);
+          setLastAnnouncedToken(101);
+          showToast('Synchronized demo data reset locally.');
+        }
+      };
+
+      const orderedQueue = useMemo(() => orders.filter(o => o.status === 'ordered'), [orders]);
+      const cookingQueue = useMemo(() => orders.filter(o => o.status === 'cooking'), [orders]);
+      const readyQueue = useMemo(() => orders.filter(o => o.status === 'ready'), [orders]);
+      const deliveredHistory = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders]);
+
+      const getStationName = () => {
+        switch (currentStation) {
+          case 'student': return 'Student Kiosk • Ordering';
+          case 'kitchen': return 'Kitchen Display • Making';
+          case 'delivery': return 'Dine-Out & Table • Delivering';
+          case 'tv': return 'Dining Hall TV Display';
+          default: return 'Portal Hub';
+        }
+      };
+
+      return (
+        <div className="flex-1 flex flex-col">
+          {/* Top Clean Header */}
+          <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-4 sm:px-6 py-3 shadow-lg">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+              
+              {/* Brand & Current Location */}
+              <div className="flex items-center space-x-3">
+                {currentStation !== 'home' && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStation('home')}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1.5 text-xs font-bold"
+                    title="Return to 3-Option Starting Menu"
+                  >
+                    <Icons.ArrowLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">Change Station</span>
+                  </button>
+                )}
+
+                <div 
+                  onClick={() => setCurrentStation('home')}
+                  className="flex items-center space-x-3 cursor-pointer group"
+                >
+                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-xl text-slate-950 font-bold shadow-md shadow-amber-500/20 group-hover:scale-105 transition">
+                    <Icons.Utensils className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h1 className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-amber-400 transition">
+                        Campus Cafeteria Sync
+                      </h1>
+                      {syncStatus === 'connected' ? (
+                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          MongoDB Live Sync
+                        </span>
+                      ) : syncStatus === 'connecting' ? (
+                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                          Connecting...
+                        </span>
+                      ) : (
+                        <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                          Offline
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Current Mode: <span className="text-amber-400 font-semibold">{getStationName()}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Utility Tools: TV Screen toggle, sound, demo reset */}
+              <div className="flex items-center space-x-2">
+                {currentStation !== 'tv' ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStation('tv')}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 flex items-center space-x-1.5 transition"
+                    title="Open Wall TV Signage Screen"
+                  >
+                    <Icons.Tv className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden md:inline">Public TV Signage</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStation('home')}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 transition"
+                  >
+                    <span>Exit TV View</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playChime();
+                    setSoundMuted(!soundMuted);
+                  }}
+                  title={soundMuted ? "Sound alerts muted (Click to test chime)" : "Sound chime active"}
+                  className={`p-2 rounded-lg border text-xs transition ${
+                    !soundMuted
+                      ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700'
+                      : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}
+                >
+                  {!soundMuted ? <Icons.Volume className="w-4 h-4" /> : <Icons.VolumeX className="w-4 h-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetDemo}
+                  className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition"
+                  title="Reset Demo Orders"
+                >
+                  <Icons.Refresh className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Toast Notification Alert */}
+          {toastMsg && (
+            <div className="fixed top-16 right-4 z-50 bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2 text-xs border border-amber-400 transition animate-bounce">
+              <Icons.Bell className="w-4 h-4 stroke-[3]" />
+              <span>{toastMsg}</span>
+            </div>
+          )}
+
+          {/* Main synchronized pipeline counter strip */}
+          <div className="bg-slate-900/60 border-b border-slate-800 px-4 py-2 text-xs">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-4">
+                <span className="flex items-center space-x-1.5 text-sky-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 inline-block"></span>
+                  <span>1. New Orders: <strong className="text-white font-mono-num">{orderedQueue.length}</strong></span>
+                </span>
+                <span className="flex items-center space-x-1.5 text-amber-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block animate-ping"></span>
+                  <span>2. In Kitchen: <strong className="text-white font-mono-num">{cookingQueue.length}</strong></span>
+                </span>
+                <span className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                  <span>3. Ready for Delivery: <strong className="text-white font-mono-num">{readyQueue.length}</strong></span>
+                </span>
+              </div>
+              <div className="text-slate-400 text-[11px] font-mono-num">
+                Delivered Today: {deliveredHistory.length} orders
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Station Body */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+            
+            {/* OPTION SELECTION STARTING SCREEN */}
+            {currentStation === 'home' && (
+              <StationSelectionHub
+                onSelectStation={setCurrentStation}
+                orderedCount={orderedQueue.length}
+                cookingCount={cookingQueue.length}
+                readyCount={readyQueue.length}
+              />
+            )}
+
+            {/* 1. STUDENT ORDERING KIOSK */}
+            {currentStation === 'student' && (
+              <StationStudentOrdering
+                orders={orders}
+                onPlaceOrder={handlePlaceOrder}
+                onSelectStation={setCurrentStation}
+                menuCatalog={menuCatalog}
+              />
+            )}
+
+            {/* 2. KITCHEN PREPARATION KDS (MAKING) */}
+            {currentStation === 'kitchen' && (
+              <StationKitchenMaking
+                orders={orders}
+                onStatusChange={handleStatusTransition}
+                onDeleteOrder={handleDeleteOrder}
+                onBack={() => setCurrentStation('home')}
+              />
+            )}
+
+            {/* 3. DINE-OUT & TABLE DISPATCH (DELIVERING) */}
+            {currentStation === 'delivery' && (
+              <StationDeliveryDispatch
+                orders={orders}
+                onStatusChange={handleStatusTransition}
+                onAnnounce={handleAnnounce}
+                onDeleteOrder={handleDeleteOrder}
+                onBack={() => setCurrentStation('home')}
+              />
+            )}
+
+            {/* LIVE DIGITAL SIGNAGE TV DISPLAY */}
+            {currentStation === 'tv' && (
+              <DigitalSignageBoard
+                readyQueue={readyQueue}
+                cookingQueue={cookingQueue}
+                orderedQueue={orderedQueue}
+                lastAnnouncedToken={lastAnnouncedToken}
+              />
+            )}
+
+            {/* Architectural Footer Guide */}
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 text-xs">
+              <div className="flex items-center justify-between text-slate-400 font-bold uppercase tracking-wider mb-2">
+                <span>Synchronized Pipeline Architecture</span>
+                <span className="text-emerald-400 font-normal">Auto-Synced Across Stations</span>
+              </div>
+              <p className="text-slate-400 leading-relaxed text-[11px]">
+                Orders placed from <strong>Student (Ordering)</strong> flow automatically into the <strong>Kitchen (Making)</strong> view. When marked finished by the kitchen staff, the ticket notifies and transfers seamlessly to <strong>Dine-Out & Tables (Delivering)</strong> and the <strong>Public TV Board</strong> with audio chime alerts.
+              </p>
+            </div>
+          </main>
+
+          <footer className="border-t border-slate-800/80 bg-slate-900/60 py-3 text-center text-xs text-slate-500">
+            Campus Dining Management System • React 18 Dynamic State & Interactive Event Handling
+          </footer>
+        </div>
+      );
+    }
+
+    function StationSelectionHub({ onSelectStation, orderedCount, cookingCount, readyCount }) {
+      return (
+        <div className="space-y-8 py-4 sm:py-8">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="text-xs uppercase font-extrabold tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+              Choose Terminal Operation
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              Select Your Starting Station
+            </h2>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Three synchronized touchpoints running live. Choose an operation below to begin handling orders.
+            </p>
+          </div>
+
+          {/* 3 Main Role Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            
+            {/* OPTION 1: Student Ordering */}
+            <div 
+              onClick={() => onSelectStation('student')}
+              className="bg-slate-900/90 hover:bg-slate-900 border-2 border-slate-800 hover:border-amber-500 rounded-3xl p-6 transition-all duration-300 cursor-pointer group shadow-xl hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                    <Icons.Utensils className="w-7 h-7" />
+                  </div>
+                  <span className="text-xs font-mono-num font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
+                    {orderedCount} In Queue
+                  </span>
+                </div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Station 1</div>
+                <h3 className="text-2xl font-black text-white mt-1 group-hover:text-amber-300 transition">
+                  Student
+                </h3>
+                <p className="text-xs text-amber-300/80 font-semibold mb-3">Self-Ordering Kiosk</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Browse meal catalog, choose between <strong>Dine-In Table</strong> or <strong>Dine-Out Takeaway</strong>, customize special requests, and generate numbered token tickets.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform">
+                <span>Enter Ordering Kiosk</span>
+                <Icons.ArrowRight className="w-4 h-4" />
+              </div>
+            </div>
+
+            {/* OPTION 2: Kitchen Making */}
+            <div 
+              onClick={() => onSelectStation('kitchen')}
+              className="bg-slate-900/90 hover:bg-slate-900 border-2 border-slate-800 hover:border-amber-500 rounded-3xl p-6 transition-all duration-300 cursor-pointer group shadow-xl hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                    <Icons.ChefHat className="w-7 h-7" />
+                  </div>
+                  <span className="text-xs font-mono-num font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {cookingCount} Cooking Now
+                  </span>
+                </div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Station 2</div>
+                <h3 className="text-2xl font-black text-white mt-1 group-hover:text-amber-300 transition">
+                  Kitchen
+                </h3>
+                <p className="text-xs text-amber-300/80 font-semibold mb-3">Chef Display System (Making)</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Chef workstation displaying active kitchen tickets, cooking checklist for each item, special notes, and one-tap advancement to delivery dispatch.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform">
+                <span>Open Kitchen Display</span>
+                <Icons.ArrowRight className="w-4 h-4" />
+              </div>
+            </div>
+
+            {/* OPTION 3: Dine-Out & Table Delivering */}
+            <div 
+              onClick={() => onSelectStation('delivery')}
+              className="bg-slate-900/90 hover:bg-slate-900 border-2 border-slate-800 hover:border-emerald-500 rounded-3xl p-6 transition-all duration-300 cursor-pointer group shadow-xl hover:shadow-2xl hover:shadow-emerald-500/10 hover:-translate-y-1 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                    <Icons.Truck className="w-7 h-7" />
+                  </div>
+                  <span className="text-xs font-mono-num font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse">
+                    {readyCount} Ready to Serve
+                  </span>
+                </div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Station 3</div>
+                <h3 className="text-2xl font-black text-white mt-1 group-hover:text-emerald-300 transition">
+                  Dine-Out & Tables
+                </h3>
+                <p className="text-xs text-emerald-300/80 font-semibold mb-3">Service & Table Dispatch (Delivering)</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Dispatch cooked trays directly to <strong>Dining Hall Tables</strong> or call students for <strong>Dine-Out takeaway pickup</strong> with audio chime alerts.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-emerald-400 group-hover:translate-x-1 transition-transform">
+                <span>Open Delivery Dispatch</span>
+                <Icons.ArrowRight className="w-4 h-4" />
+              </div>
+            </div>
+
+          </div>
+
+          {/* Quick link to Digital Wall Board */}
+          <div className="max-w-5xl mx-auto bg-slate-900/50 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-slate-800 rounded-xl text-slate-300">
+                <Icons.Tv className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white">Need the Cafeteria Hallway TV Screen?</h4>
+                <p className="text-xs text-slate-400">Launch the high-visibility digital signboard displaying serving tokens and waitlist.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onSelectStation('tv')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white rounded-xl transition whitespace-nowrap"
+            >
+              Open Full TV Display Screen
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function StationStudentOrdering({ orders, onPlaceOrder, onSelectStation, menuCatalog }) {
+      const [orderType, setOrderType] = useState('dine-in');
+      const [tableNumber, setTableNumber] = useState('Table 1');
+      const [studentName, setStudentName] = useState('');
+      const [notes, setNotes] = useState('');
+      const [cart, setCart] = useState({});
+      const [categoryFilter, setCategoryFilter] = useState('All');
+      const [placedTokenModal, setPlacedTokenModal] = useState(null);
+
+      const [searchQuery, setSearchQuery] = useState('');
+      const [searchedOrder, setSearchedOrder] = useState(null);
+
+      const categories = ['All', 'Grills & Rolls', 'South Indian', 'Meals & Bowls', 'Beverages'];
+
+      const filteredMenu = useMemo(() => {
+        if (categoryFilter === 'All') return menuCatalog;
+        return menuCatalog.filter(item => item.category === categoryFilter);
+      }, [categoryFilter, menuCatalog]);
+
+      const addToCart = (dish) => {
+        setCart(prev => ({
+          ...prev,
+          [dish.id]: {
+            ...dish,
+            qty: (prev[dish.id]?.qty || 0) + 1
+          }
+        }));
+      };
+
+      const removeFromCart = (dishId) => {
+        setCart(prev => {
+          if (!prev[dishId]) return prev;
+          const newQty = prev[dishId].qty - 1;
+          if (newQty <= 0) {
+            const copy = { ...prev };
+            delete copy[dishId];
+            return copy;
+          }
+          return {
+            ...prev,
+            [dishId]: { ...prev[dishId], qty: newQty }
+          };
+        });
+      };
+
+      const cartItemsList = Object.values(cart);
+      const cartTotal = cartItemsList.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+      const handleSubmitOrder = async (e) => {
+        e.preventDefault();
+        if (cartItemsList.length === 0) return;
+
+        const assignedCounter = cartItemsList.some(i => (i.category || '').toLowerCase().includes('south indian'))
+          ? 'Counter C (South Indian)'
+          : cartItemsList.some(i => (i.category || '').toLowerCase().includes('beverages'))
+          ? 'Counter B (Beverages & Bakery)'
+          : 'Counter A (Hot Grills)';
+
+        const newOrderPayload = {
+          studentName: studentName.trim() || 'Student Guest',
+          type: orderType,
+          orderType: orderType,
+          tableNumber: orderType === 'dine-in' ? tableNumber : 'Takeaway Pack',
+          counter: assignedCounter,
+          items: cartItemsList.map(i => ({
+            id: i.id || i._id,
+            menuItemId: i._id || (i.id && i.id.length === 24 ? i.id : undefined),
+            name: i.name,
+            qty: i.qty,
+            quantity: i.qty,
+            price: i.price,
+            category: i.category,
+          })),
+          total: cartTotal,
+          totalAmount: cartTotal,
+          specialNotes: notes.trim()
+        };
+
+        const generatedToken = await onPlaceOrder(newOrderPayload);
+        if (generatedToken) {
+          setPlacedTokenModal({ token: generatedToken, type: orderType, table: orderType === 'dine-in' ? tableNumber : 'Takeaway Pack' });
+          setCart({});
+          setStudentName('');
+          setNotes('');
+        }
+      };
+
+      const handleLookup = async (e) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+        const num = parseInt(searchQuery.replace(/\D/g, ''), 10);
+        let match = orders.find(o => (o.token === num || o.tokenNumber === num) || (o.studentName && o.studentName.toLowerCase().includes(searchQuery.toLowerCase())));
+        if (!match && !isNaN(num)) {
+          try {
+            const res = await fetch(`${API_BASE}/api/orders/token/${num}`);
+            const json = await res.json();
+            if (json.success && json.data) {
+              match = json.data;
+            }
+          } catch (err) {
+            console.warn('Track lookup error:', err);
+          }
+        }
+        setSearchedOrder(match || 'NOT_FOUND');
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Station Banner */}
+          <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                <Icons.Utensils className="w-4 h-4" />
+                <span>Station 1: Student Self-Ordering & Tracker</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-white mt-1">
+                Choose Dine-In Table or Quick Dine-Out
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Customize your meal. Once placed, your ticket will appear instantly in the Kitchen.
+              </p>
+            </div>
+
+            {/* Quick tracker search form */}
+            <form onSubmit={handleLookup} className="flex items-center gap-2 w-full md:w-auto">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Track Token # (e.g. 104)"
+                className="bg-slate-950 border border-slate-700 px-3 py-2 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-mono-num w-full sm:w-44"
+              />
+              <button
+                type="submit"
+                className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition"
+              >
+                Track
+              </button>
+            </form>
+          </div>
+
+          {/* Searched Ticket Result Card if searched */}
+          {searchedOrder && (
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+              {searchedOrder === 'NOT_FOUND' ? (
+                <div className="text-xs text-rose-400">
+                  Ticket not found. Please verify your receipt token number.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-700 flex items-center justify-center font-mono-num font-black text-xl text-amber-400">
+                      #{searchedOrder.token}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold text-white">{searchedOrder.studentName}</span>
+                        <span className="text-[11px] text-slate-400">({searchedOrder.type === 'dine-in' ? searchedOrder.tableNumber : 'Dine-Out Takeaway'})</span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {searchedOrder.items.map(i => `${i.name} (x${i.qty})`).join(', ')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {searchedOrder.status === 'ready' && (
+                      <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold flex items-center space-x-1">
+                        <Icons.CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <span>READY AT {searchedOrder.counter.toUpperCase()}</span>
+                      </span>
+                    )}
+                    {searchedOrder.status === 'cooking' && (
+                      <span className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold flex items-center space-x-1">
+                        <Icons.Clock className="w-4 h-4 text-amber-400" />
+                        <span>NOW SIZZLING IN KITCHEN</span>
+                      </span>
+                    )}
+                    {searchedOrder.status === 'ordered' && (
+                      <span className="px-3 py-1.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded-lg text-xs font-semibold">
+                        In Queue: Awaiting Chef Pickup
+                      </span>
+                    )}
+                    {searchedOrder.status === 'delivered' && (
+                      <span className="px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-xs">
+                        Delivered & Enjoyed
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Ordering Grid: Left Menu, Right Cart & Options */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* MENU ITEMS COLUMN */}
+            <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+              
+              {/* Category Filter Pills */}
+              <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+                      categoryFilter === cat
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Dish Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {filteredMenu.map(dish => {
+                  const inCartQty = cart[dish.id]?.qty || 0;
+                  return (
+                    <div
+                      key={dish.id}
+                      className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex flex-col justify-between transition-all group"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                            {dish.category}
+                          </span>
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono-num">
+                            <Icons.Clock className="w-3 h-3 text-slate-500" />
+                            {dish.time || dish.preparationTime || '3-5m'}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-slate-100 text-sm mt-2 group-hover:text-amber-300 transition">
+                          {dish.name}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                          {dish.desc || dish.description}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                        <span className="text-base font-black text-white font-mono-num">
+                          ₹{dish.price}
+                        </span>
+
+                        {inCartQty === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => addToCart(dish)}
+                            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition shadow flex items-center space-x-1"
+                          >
+                            <Icons.Plus className="w-3.5 h-3.5" />
+                            <span>Add</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center space-x-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(dish.id)}
+                              className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition"
+                            >
+                              <Icons.Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs font-bold text-white font-mono-num w-5 text-center">
+                              {inCartQty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addToCart(dish)}
+                              className="w-6 h-6 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center transition font-bold"
+                            >
+                              <Icons.Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CART & TABLE SELECTION COLUMN */}
+            <div className="lg:col-span-5 xl:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl sticky top-20">
+              <h3 className="font-extrabold text-white text-base pb-3 border-b border-slate-800 flex items-center justify-between">
+                <span>Your Order Ticket</span>
+                <span className="text-xs font-mono-num text-amber-400">
+                  {cartItemsList.length} items
+                </span>
+              </h3>
+
+              <form onSubmit={handleSubmitOrder} className="mt-4 space-y-4">
+                {/* Mode Selector: Dine-In vs Dine-Out */}
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">
+                    Dining Preference
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setOrderType('dine-in')}
+                      className={`py-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                        orderType === 'dine-in'
+                          ? 'bg-amber-500 text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Icons.Utensils className="w-3.5 h-3.5" />
+                      <span>Dine-In Table</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOrderType('dine-out')}
+                      className={`py-2 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                        orderType === 'dine-out'
+                          ? 'bg-amber-500 text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Icons.Truck className="w-3.5 h-3.5" />
+                      <span>Dine-Out / Pack</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conditional Table Number picker if Dine-In */}
+                {orderType === 'dine-in' ? (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1.5">
+                      Select Dine-In Table #
+                    </label>
+                    <select
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15].map(t => (
+                        <option key={t} value={`Table ${t}`}>Table #{t} (Dining Hall)</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 text-[11px] text-slate-400 flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span>Meal will be packed in thermal takeaway packaging with cutlery.</span>
+                  </div>
+                )}
+
+                {/* Student Name */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Student Name / Roll Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ishaan Verma (CS-22)"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Special Request */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Special Cooking Request (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Extra spicy, no mayo, less ice"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Cart Items List */}
+                <div className="border-t border-slate-800 pt-3">
+                  <div className="text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-2">
+                    Cart Items
+                  </div>
+
+                  {cartItemsList.length === 0 ? (
+                    <div className="py-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+                      Your tray is empty. Tap <span className="text-amber-400 font-bold">+Add</span> on items to order!
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {cartItemsList.map(item => (
+                        <div key={item.id} className="flex items-center justify-between text-xs bg-slate-950 p-2.5 rounded-lg border border-slate-800/80">
+                          <div>
+                            <div className="font-semibold text-slate-200">{item.name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono-num">
+                              ₹{item.price} × {item.qty}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono-num font-bold text-white">
+                              ₹{item.price * item.qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-slate-500 hover:text-rose-400 p-1"
+                            >
+                              <Icons.Trash className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Total and Place Order Button */}
+                <div className="border-t border-slate-800 pt-3">
+                  <div className="flex items-center justify-between text-sm font-bold text-white mb-3">
+                    <span>Payable Total:</span>
+                    <span className="text-lg text-amber-400 font-mono-num">₹{cartTotal}</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={cartItemsList.length === 0}
+                    className={`w-full py-3 rounded-xl font-extrabold text-sm transition shadow-lg flex items-center justify-center space-x-2 ${
+                      cartItemsList.length > 0
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Icons.CheckCircle className="w-4 h-4" />
+                    <span>Send Order Ticket to Kitchen</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Modal popup on successful order creation */}
+          {placedTokenModal && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative">
+                <div className="w-16 h-16 rounded-full bg-amber-500/20 border-2 border-amber-400 mx-auto flex items-center justify-center text-amber-400">
+                  <Icons.CheckCircle className="w-8 h-8" />
+                </div>
+
+                <div>
+                  <span className="text-xs uppercase font-bold tracking-widest text-amber-400">Order Placed</span>
+                  <div className="text-5xl font-black text-white font-mono-num my-1">
+                    #{placedTokenModal.token}
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Assigned: <strong className="text-white">{placedTokenModal.table}</strong>
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Your ticket has been sent to the Kitchen station. Watch the status board as the chef prepares your meal!
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlacedTokenModal(null)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacedTokenModal(null);
+                      onSelectStation('kitchen');
+                    }}
+                    className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1"
+                  >
+                    <span>View in Kitchen</span>
+                    <Icons.ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function StationKitchenMaking({ orders, onStatusChange, onDeleteOrder, onBack }) {
+      const [filterCategory, setFilterCategory] = useState('active');
+
+      const kitchenOrders = useMemo(() => {
+        if (filterCategory === 'cooking') return orders.filter(o => o.status === 'cooking');
+        if (filterCategory === 'active') return orders.filter(o => o.status === 'ordered' || o.status === 'cooking');
+        return orders;
+      }, [orders, filterCategory]);
+
+      return (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onBack}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
+                title="Back to Stations Hub"
+              >
+                <Icons.ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <Icons.ChefHat className="w-4 h-4" />
+                  <span>Station 2: Kitchen Display System (Making)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                  Active Chef Kitchen Pipeline
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Cook dishes, check ingredients, and advance finished meals to Delivery Station.
+                </p>
+              </div>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setFilterCategory('active')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  filterCategory === 'active' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                In Kitchen ({orders.filter(o => o.status === 'ordered' || o.status === 'cooking').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterCategory('cooking')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  filterCategory === 'cooking' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                Cooking Now ({orders.filter(o => o.status === 'cooking').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterCategory('all')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  filterCategory === 'all' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                All Tickets
+              </button>
+            </div>
+          </div>
+
+          {/* Kitchen Orders Grid */}
+          {kitchenOrders.length === 0 ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 space-y-2">
+              <Icons.ChefHat className="w-10 h-10 mx-auto text-slate-600" />
+              <p className="text-base font-bold text-slate-400">Kitchen counter is clear!</p>
+              <p className="text-xs text-slate-500">
+                New orders placed from <strong>Student Kiosk</strong> will instantly appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {kitchenOrders.map(order => (
+                <KitchenTicketCard
+                  key={order.id}
+                  order={order}
+                  onStatusChange={onStatusChange}
+                  onDeleteOrder={onDeleteOrder}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function KitchenTicketCard({ order, onStatusChange, onDeleteOrder }) {
+      const [checkedItems, setCheckedItems] = useState({});
+
+      const toggleCheck = (idx) => {
+        setCheckedItems(prev => ({
+          ...prev,
+          [idx]: !prev[idx]
+        }));
+      };
+
+      const isCooking = order.status === 'cooking';
+      const isReady = order.status === 'ready';
+
+      return (
+        <div className={`rounded-2xl p-4 border flex flex-col justify-between transition shadow-xl ${
+          isCooking
+            ? 'bg-slate-900 border-amber-500/50 ring-1 ring-amber-500/30'
+            : isReady
+            ? 'bg-slate-900/70 border-emerald-500/30'
+            : 'bg-slate-900 border-slate-800'
+        }`}>
+          <div>
+            {/* Ticket Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl font-black font-mono-num text-white">
+                    #{order.token}
+                  </span>
+                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                    order.type === 'dine-in'
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                      : 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+                  }`}>
+                    {order.type === 'dine-in' ? order.tableNumber : 'Dine-Out'}
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-slate-300 mt-1">
+                  {order.studentName}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[11px] text-slate-400 font-mono-num block">{order.time}</span>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md inline-block mt-1 ${
+                  isCooking
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : isReady
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-sky-500/20 text-sky-300'
+                }`}>
+                  {order.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Special Instructions Alert */}
+            {order.specialNotes && (
+              <div className="mt-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-xs text-amber-300 font-medium">
+                Note: {order.specialNotes}
+              </div>
+            )}
+
+            {/* Dish Items Checklist for Chef */}
+            <div className="mt-3 space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                Kitchen Checklist:
+              </span>
+              {order.items.map((item, idx) => {
+                const done = checkedItems[idx];
+                return (
+                  <button
+                    type="button"
+                    key={idx}
+                    onClick={() => toggleCheck(idx)}
+                    className={`w-full text-left p-2 rounded-lg text-xs font-medium flex items-center justify-between border transition ${
+                      done
+                        ? 'bg-slate-950/60 border-slate-800 text-slate-500 line-through'
+                        : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
+                    }`}
+                  >
+                    <span>{item.qty} × {item.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                      {done ? 'Cooked' : 'Prep'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Action Transition Buttons */}
+          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => onDeleteOrder(order.id || order.orderId || order._id)}
+              title="Cancel Ticket"
+              className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+            >
+              <Icons.Trash className="w-4 h-4" />
+            </button>
+
+            {order.status === 'ordered' && (
+              <button
+                type="button"
+                onClick={() => onStatusChange(order.id || order.orderId || order._id, 'cooking')}
+                className="flex-1 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-xs transition shadow flex items-center justify-center space-x-1"
+              >
+                <Icons.ChefHat className="w-3.5 h-3.5" />
+                <span>Start Cooking</span>
+              </button>
+            )}
+
+            {order.status === 'cooking' && (
+              <button
+                type="button"
+                onClick={() => onStatusChange(order.id || order.orderId || order._id, 'ready')}
+                className="flex-1 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold rounded-xl text-xs transition shadow flex items-center justify-center space-x-1"
+              >
+                <Icons.Bell className="w-3.5 h-3.5" />
+                <span>Finish & Call Dispatch</span>
+              </button>
+            )}
+
+            {order.status === 'ready' && (
+              <button
+                type="button"
+                onClick={() => onStatusChange(order.id || order.orderId || order._id, 'delivered')}
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition border border-slate-700"
+              >
+                <span>Delivered</span>
+              </button>
+            )}
+
+            {order.status === 'delivered' && (
+              <button
+                type="button"
+                onClick={() => onStatusChange(order.id || order.orderId || order._id, 'cooking')}
+                className="text-xs text-slate-500 hover:text-slate-300 underline"
+              >
+                Re-open
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function StationDeliveryDispatch({ orders, onStatusChange, onAnnounce, onDeleteOrder, onBack }) {
+      const [typeTab, setTypeTab] = useState('all');
+
+      const readyAndActive = useMemo(() => {
+        return orders.filter(o => o.status === 'ready' || o.status === 'cooking');
+      }, [orders]);
+
+      const filtered = useMemo(() => {
+        if (typeTab === 'dine-in') return readyAndActive.filter(o => o.type === 'dine-in');
+        if (typeTab === 'dine-out') return readyAndActive.filter(o => o.type === 'dine-out');
+        return readyAndActive;
+      }, [readyAndActive, typeTab]);
+
+      return (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onBack}
+                className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
+                title="Back to Stations Hub"
+              >
+                <Icons.ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                  <Icons.Truck className="w-4 h-4" />
+                  <span>Station 3: Dine-Out & Table Delivery (Delivering)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                  Service & Table Dispatch Counter
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Deliver meals directly to student tables or handover Dine-Out takeaway packs.
+                </p>
+              </div>
+            </div>
+
+            {/* Filter buttons */}
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setTypeTab('all')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  typeTab === 'all' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                All Ready & Cooking ({readyAndActive.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeTab('dine-in')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  typeTab === 'dine-in' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                Dine-In Tables
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeTab('dine-out')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                  typeTab === 'dine-out' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                }`}
+              >
+                Dine-Out Takeaways
+              </button>
+            </div>
+          </div>
+
+          {/* Delivery Dispatch Cards List */}
+          {filtered.length === 0 ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 space-y-2">
+              <Icons.CheckCircle className="w-10 h-10 mx-auto text-emerald-500/40" />
+              <p className="text-base font-bold text-slate-300">No pending deliveries right now!</p>
+              <p className="text-xs text-slate-500">
+                Dishes finished in the Kitchen will pop up here ready for serving.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map(order => (
+                <div
+                  key={order.id}
+                  className={`bg-slate-900 border rounded-2xl p-4 flex flex-col justify-between transition-all ${
+                    order.status === 'ready'
+                      ? 'border-emerald-500/50 ring-1 ring-emerald-500/30'
+                      : 'border-slate-800 opacity-80'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-3xl font-black font-mono-num text-white">
+                            #{order.token}
+                          </span>
+                          <span className={`text-xs uppercase font-extrabold px-2.5 py-1 rounded-lg ${
+                            order.type === 'dine-in'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}>
+                            {order.type === 'dine-in' ? order.tableNumber : 'Dine-Out Pickup'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold text-slate-200 mt-1">
+                          {order.studentName}
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        order.status === 'ready'
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {order.status === 'ready' ? 'Ready to Serve' : 'Cooking in Kitchen'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-xs text-slate-300">
+                      <div className="text-slate-400 text-[11px] font-medium">Order Items:</div>
+                      {order.items.map((i, idx) => (
+                        <div key={idx} className="flex justify-between font-medium">
+                          <span>{i.qty || i.quantity} × {i.name}</span>
+                          <span className="font-mono-num text-slate-400">₹{i.price * (i.qty || i.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {order.specialNotes && (
+                      <div className="mt-2.5 text-[11px] bg-slate-950 p-2 rounded-lg text-amber-300 border border-slate-800">
+                        Instructions: {order.specialNotes}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dispatch Controls */}
+                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onAnnounce(order.token || order.tokenNumber, order.type === 'dine-in' ? order.tableNumber : 'Takeaway')}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                      title="Ring chime and announce"
+                    >
+                      <Icons.Bell className="w-3.5 h-3.5" />
+                      <span>Ring Chime</span>
+                    </button>
+
+                    {order.status === 'ready' ? (
+                      <button
+                        type="button"
+                        onClick={() => onStatusChange(order.id || order.orderId || order._id, 'delivered')}
+                        className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 shadow"
+                      >
+                        <Icons.CheckCircle className="w-4 h-4 stroke-[2.5]" />
+                        <span>
+                          {order.type === 'dine-in' ? 'Deliver to Table' : 'Handover to Student'}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onStatusChange(order.id || order.orderId || order._id, 'ready')}
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition border border-slate-700"
+                      >
+                        Fast-Track to Ready
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function DigitalSignageBoard({ readyQueue, cookingQueue, orderedQueue, lastAnnouncedToken }) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-xl">
+            <div className="flex items-center space-x-3">
+              <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+              <div>
+                <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-white">
+                  Cafeteria Public Display Screen
+                </h2>
+                <p className="text-xs text-slate-400">Large digital signage for students waiting in the dining hall</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 font-mono-num bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+              Live: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* COLUMN 1: NOW READY / SERVING */}
+            <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[420px]">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-emerald-500/20 mb-5">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 inline-block"></span>
+                    <h3 className="text-2xl font-black uppercase tracking-wider text-emerald-400">
+                      Now Ready For Pickup
+                    </h3>
+                  </div>
+                  <span className="bg-emerald-500/20 text-emerald-300 font-extrabold px-3 py-1 rounded-full text-xs font-mono-num">
+                    {readyQueue.length} Ready
+                  </span>
+                </div>
+
+                {readyQueue.length === 0 ? (
+                  <div className="py-16 text-center text-slate-500 space-y-2">
+                    <Icons.Coffee className="w-10 h-10 mx-auto text-slate-600" />
+                    <p className="text-sm font-semibold">All called orders have been collected.</p>
+                    <p className="text-xs text-slate-600">Your token will illuminate here as soon as it is hot!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                    {readyQueue.map(order => {
+                      const isRecent = order.token === lastAnnouncedToken;
+                      return (
+                        <div
+                          key={order.id}
+                          className={`relative rounded-2xl p-4 text-center border transition-all duration-300 ${
+                            isRecent
+                              ? 'bg-gradient-to-b from-emerald-500/25 to-slate-900 border-emerald-400 ring-2 ring-emerald-400/50 shadow-xl shadow-emerald-500/20 scale-105'
+                              : 'bg-slate-800/80 border-emerald-500/30'
+                          }`}
+                        >
+                          {isRecent && (
+                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-emerald-400 text-slate-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full shadow">
+                              Just Called!
+                            </span>
+                          )}
+                          <div className="text-4xl font-black text-emerald-300 font-mono-num tracking-tight">
+                            #{order.token}
+                          </div>
+                          <div className="mt-2 text-xs font-bold text-emerald-400/90 bg-emerald-950/70 py-1 px-2 rounded-lg border border-emerald-500/30 truncate">
+                            {order.type === 'dine-in' ? order.tableNumber : 'Takeaway Pack'}
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-300 font-medium truncate">
+                            {order.studentName}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[11px] text-emerald-400/80 font-medium pt-4 border-t border-emerald-500/20 mt-6 flex items-center justify-between">
+                <span>Please present your token ticket at the counter</span>
+                <span>Bon Appétit!</span>
+              </div>
+            </div>
+
+            {/* COLUMN 2: COOKING NOW & UPCOMING QUEUE */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col justify-between min-h-[420px]">
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                  <div className="flex items-center space-x-2">
+                    <Icons.Clock className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-2xl font-black uppercase tracking-wider text-amber-400">
+                      Preparing Now
+                    </h3>
+                  </div>
+                  <span className="bg-amber-500/20 text-amber-300 font-extrabold px-3 py-1 rounded-full text-xs font-mono-num">
+                    {cookingQueue.length} Cooking
+                  </span>
+                </div>
+
+                {cookingQueue.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 text-xs">
+                    No orders currently on the grill.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {cookingQueue.map(order => (
+                      <div
+                        key={order.id}
+                        className="bg-slate-800/60 border border-amber-500/20 rounded-xl p-3 text-center"
+                      >
+                        <div className="text-3xl font-black text-amber-300 font-mono-num">
+                          #{order.token}
+                        </div>
+                        <div className="text-[11px] text-slate-300 mt-1 font-semibold truncate">
+                          {order.type === 'dine-in' ? order.tableNumber : 'Dine-Out'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate">
+                          {order.studentName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Waiting in Queue Line */}
+              <div className="mt-6 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Up Next In Queue Line ({orderedQueue.length})
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono-num">Estimated ~3-5m wait</span>
+                </div>
+
+                {orderedQueue.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Kitchen queue is clear.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {orderedQueue.map((order, idx) => (
+                      <div
+                        key={order.id}
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono-num"
+                      >
+                        <span className="text-[10px] text-slate-500 font-sans">#{idx + 1}</span>
+                        <span className="font-bold text-white">#{order.token}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

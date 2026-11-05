@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Campus Cafeteria Sync API",
+    "_postman_id": "campus-cafeteria-collection-2026",
+    "description": "Complete Postman collection for testing the Campus Cafeteria Queue Display & Dispatch Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "menuItemId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tokenNumber",
+      "value": "101",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Student Rohan\",\n  \"email\": \"rohan.student@cafeteria.edu\",\n  \"password\": \"Student@Password123\",\n  \"role\": \"student\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('authToken', json.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@cafeteria.edu\",\n  \"password\": \"Admin@Password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile (Protected)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "Get All Menu Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"]
+            }
+          }
+        },
+        {
+          "name": "Get Menu Item By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/{{menuItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", "{{menuItemId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Menu Item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chilli Cheese Garlic Toast\",\n  \"price\": 85,\n  \"category\": \"Grills & Rolls\",\n  \"preparationTime\": \"3-4m\",\n  \"description\": \"Crispy sourdough toast with melted cheddar and chopped green chillies\",\n  \"available\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/menu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu"]
+            }
+          }
+        },
+        {
+          "name": "Update Menu Item",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 90,\n  \"preparationTime\": \"4m\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/{{menuItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", "{{menuItemId}}"]
+            }
+          }
+        },
+        {
+          "name": "Patch Menu Availability",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"available\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/{{menuItemId}}/availability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", "{{menuItemId}}", "availability"]
+            }
+          }
+        },
+        {
+          "name": "Delete Menu Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/{{menuItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "menu", "{{menuItemId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place Order (Dine-In)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentName\": \"Aditi Roy\",\n  \"orderType\": \"dine-in\",\n  \"tableNumber\": \"Table 5\",\n  \"items\": [\n    {\n      \"name\": \"Crispy Veg Masala Burger\",\n      \"quantity\": 1,\n      \"price\": 80\n    },\n    {\n      \"name\": \"Iced Hazelnut Cold Brew\",\n      \"quantity\": 1,\n      \"price\": 75\n    }\n  ],\n  \"specialNotes\": \"Extra napkins\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Place Order (Dine-Out Takeaway)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentName\": \"Siddharth Rao\",\n  \"orderType\": \"dine-out\",\n  \"items\": [\n    {\n      \"name\": \"Mysore Masala Dosa\",\n      \"quantity\": 2,\n      \"price\": 95\n    }\n  ],\n  \"specialNotes\": \"Pack sambar in separate cups\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get All Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Order By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            }
+          }
+        },
+        {
+          "name": "Track Order By Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/token/{{tokenNumber}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "token", "{{tokenNumber}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Order Status to Cooking",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cooking\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Order Status to Ready",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ready\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Order Status to Delivered",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete Order",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reset Demo Orders",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/reset-demo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "reset-demo"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Queue Status",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Newly Ordered Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/status/ordered",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "status", "ordered"]
+            }
+          }
+        },
+        {
+          "name": "Get Cooking Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/status/cooking",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "status", "cooking"]
+            }
+          }
+        },
+        {
+          "name": "Get Ready Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/status/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "status", "ready"]
+            }
+          }
+        },
+        {
+          "name": "Get Delivered Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/status/delivered",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "status", "delivered"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
