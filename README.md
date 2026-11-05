@@ -76,7 +76,7 @@ You can open the application in any of the following ways:
 
 ---
 
-## 7. REST API Endpoints Summary
+## 4. REST API Endpoints Summary
 
 ### Menu APIs
 | Method | Endpoint | Description |
@@ -117,26 +117,7 @@ You can open the application in any of the following ways:
 
 ---
 
-## 8. Postman API Testing Instructions
-
-A complete, pre-configured collection is saved at:
-[`backend/Campus_Cafeteria_Postman_Collection.json`](file:///c:/Users/geeth/OneDrive/Documents/cafteria/backend/Campus_Cafeteria_Postman_Collection.json)
-
-### How to Import:
-1. Open Postman.
-2. Click **Import** (top left).
-3. Drag & drop or select `backend/Campus_Cafeteria_Postman_Collection.json`.
-4. The **Campus Cafeteria Sync API** collection will appear with all 19 endpoints neatly organized in folders:
-   - `Health Check`
-   - `Auth` (Register, Login with auto-token capture, Profile)
-   - `Menu` (Get All, Get By ID, Create, Update, Patch Availability, Delete)
-   - `Orders` (Place Dine-In, Place Dine-Out, Get All, Track By Token, Update Statuses, Delete, Reset)
-   - `Dashboard & Queue Status` (Stats, Ordered, Cooking, Ready, Delivered)
-5. Run tests against `http://localhost:5000`.
-
----
-
-## 9. Verification & Tested Features
+## 5. Verification & Tested Features
 
 | # | Verified Feature | Result |
 |---|---|---|
