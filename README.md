@@ -1,8 +1,15 @@
 # Campus Cafeteria Sync – Queue Display & Dispatch
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-brightgreen?style=for-the-badge&logo=render)](https://campus-cafeteria-nf1z.onrender.com)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/geethikasaibhima/campus_cafeteria)
+
+> 🚀 **Live Demo URL**: **[https://campus-cafeteria-nf1z.onrender.com](https://campus-cafeteria-nf1z.onrender.com)**  
+> 📦 **GitHub Repository**: **[https://github.com/geethikasaibhima/campus_cafeteria](https://github.com/geethikasaibhima/campus_cafeteria)**
+
 A complete, high-performance cafeteria queue management system powered by **Node.js, Express.js, MongoDB Atlas (Mongoose), Socket.IO**, and an interactive **React 18** real-time multi-station frontend.
 
 ---
+
 
 ## 1. Project Overview & Features
 
