@@ -1,4 +1,13 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Fix for querySrv ECONNREFUSED on Windows / local Wi-Fi / ISP routers:
+// Route SRV DNS resolution through Google's public DNS servers
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch (dnsErr) {
+  console.warn('[DNS Notice]: Unable to override DNS servers:', dnsErr.message);
+}
 
 const connectDB = async () => {
   try {
